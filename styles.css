@@ -1,0 +1,989 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* ルーレット関連のスタイル */
+.roulette-container {
+    margin: 30px 0;
+    text-align: center;
+}
+
+.roulette {
+    position: relative;
+    width: 450px;
+    height: 450px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background-color: #f9f9f9;
+    border: 10px solid #ddd;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 角度マーカー - 0度（右） */
+.angle-0 {
+    display: none;
+    position: absolute;
+    top: 50%;
+    right: -30px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #e74c3c;
+    z-index: 20;
+}
+
+/* 45度マーカー（右下） */
+.angle-45 {
+    display: none;
+    position: absolute;
+    bottom: 5%;
+    right: 5%;
+    font-size: 10px;
+    color: #9b59b6;
+    z-index: 20;
+}
+
+/* 90度マーカー（下） */
+.angle-90 {
+    display: none;
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #3498db;
+    z-index: 20;
+}
+
+/* 135度マーカー（左下） */
+.angle-135 {
+    display: none;
+    position: absolute;
+    bottom: 5%;
+    left: 5%;
+    font-size: 10px;
+    color: #9b59b6;
+    z-index: 20;
+}
+
+/* 180度マーカー（左） */
+.angle-180 {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: -30px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #2ecc71;
+    z-index: 20;
+}
+
+/* 225度マーカー（左上） */
+.angle-225 {
+    display: none;
+    position: absolute;
+    top: 5%;
+    left: 5%;
+    font-size: 10px;
+    color: #9b59b6;
+    z-index: 20;
+}
+
+/* 270度マーカー（上） */
+.angle-270 {
+    display: none;
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #f39c12;
+    z-index: 20;
+}
+
+/* 315度マーカー（右上） */
+.angle-315 {
+    display: none;
+    position: absolute;
+    top: 5%;
+    right: 5%;
+    font-size: 10px;
+    color: #9b59b6;
+    z-index: 20;
+}
+
+/* 角度マーカーの目盛り線 */
+.angle-tick {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.angle-tick::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 100%;
+    width: 1px;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 9.09%,
+        rgba(0, 0, 0, 0.15) 9.09%,
+        rgba(0, 0, 0, 0.15) 10%
+    );
+}
+
+.angle-tick::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: repeating-linear-gradient(
+        to right,
+        transparent,
+        transparent 9.09%,
+        rgba(0, 0, 0, 0.15) 9.09%,
+        rgba(0, 0, 0, 0.15) 10%
+    );
+}
+
+/* 45度ごとの補助線 */
+.roulette-angle-markers {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* 縦横の中心線 */
+.roulette-angle-markers::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    border-left: 1px dashed rgba(0, 0, 0, 0.3);
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+}
+
+/* 対角線 */
+.roulette-angle-markers::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    transform: rotate(45deg);
+    border-left: 1px dashed rgba(0, 0, 0, 0.2);
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.2);
+}
+
+.roulette-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    transition: transform 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* セクションはJavaScriptで動的に適用されます */
+.roulette-section {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+.section-label {
+    pointer-events: none;
+    z-index: 2;
+}
+
+.roulette-section svg {
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+/* ルーレットマーカーのスタイル */
+.roulette-marker {
+    position: absolute;
+    top: -38px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 45px solid red;
+    z-index: 10;
+}
+
+/* ボタン */
+.btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.btn:hover {
+    background-color: #2980b9;
+}
+
+#spin-button {
+    font-size: 18px;
+    padding: 12px 30px;
+    background-color: #e74c3c;
+}
+
+#spin-button:hover {
+    background-color: #c0392b;
+}
+
+/* 結果表示 */
+.result-container {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.counters {
+    margin-top: 20px;
+}
+
+#totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.total-item {
+    background-color: #eee;
+    padding: 8px 12px;
+    border-radius: 5px;
+}
+
+/* 設定エリア */
+.config-container {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+#roulette-select {
+    padding: 10px;
+    margin-right: 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+#config-editor {
+    margin-top: 15px;
+}
+
+#config-text {
+    width: 100%;
+    height: 100px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-family: monospace;
+    margin-bottom: 10px;
+    resize: vertical;
+}
+
+/* 履歴 */
+.history-container {
+    margin: 30px 0;
+    padding: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #eee;
+}
+
+.history-container summary {
+    padding: 15px 20px;
+    cursor: pointer;
+    list-style: none;
+    outline: none;
+    border-bottom: 1px solid #eee;
+}
+
+.history-container summary:hover {
+    background-color: #f9f9f9;
+}
+
+.history-container[open] summary {
+    border-bottom: 1px solid #eee;
+}
+
+.history-container summary h2 {
+    display: inline;
+    margin-bottom: 0;
+}
+
+#history-list {
+    list-style-type: none;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0 20px 10px 20px;
+    margin: 0;
+}
+
+#history-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+#history-list li:last-child {
+    border-bottom: none;
+}
+
+/* ルーレット選択ボタン */
+.roulette-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.roulette-button {
+    padding: 8px 15px;
+    background-color: #f1f1f1;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.roulette-button:hover {
+    background-color: #e0e0e0;
+}
+
+.roulette-button.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+@media (max-width: 600px) {
+    .roulette {
+        width: 250px;
+        height: 250px;
+    }
+}
+
+/* 合計欄のヘッダー */
+.totals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.totals-header h3 {
+    margin-bottom: 0;
+}
+
+/* 小さいボタン用の共通スタイル */
+.btn-small {
+    padding: 5px 10px;
+    font-size: 14px;
+}
+
+/* セカンダリボタン（リセット用） */
+.btn-secondary {
+    background-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* デフォルトの三角マーカーを少しカスタマイズ (任意) */
+.history-container summary::marker {
+    /* content: '▶ '; */ /* 絵文字やアイコンフォントを使うことも可能 */
+}
+.history-container[open] summary::marker {
+    /* content: '▼ '; */
+}
+
+/* 新しい設定フォーム */
+.config-form {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+}
+
+/* ★★★ 新しいスタイル: フォーム内横並びグループ ★★★ */
+.config-form-inline-group {
+    display: flex;
+    flex-wrap: wrap; /* 非常に狭い画面では折り返しを許容 */
+    align-items: flex-end; /* 下端揃え */
+    gap: 15px; /* 要素間のスペース */
+}
+
+.config-form .form-group {
+    flex-grow: 1; /* フォームグループが伸びるように */
+    min-width: 180px; /* グループの最小幅 (折り返し制御) */
+}
+
+.config-form label {
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.config-form select,
+.config-form input[type="number"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 80px; /* ある程度の幅を確保 */
+}
+
+.config-form input[type="number"] {
+    width: 100px; /* 比率入力は少し広めに */
+}
+
+/* 項目リスト */
+.item-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+    max-height: 200px; /* 多くなった場合にスクロール */
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 5px;
+}
+
+.item-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: #fff;
+    border-bottom: 1px solid #eee;
+}
+
+.item-list li:last-child {
+    border-bottom: none;
+}
+
+.item-list .item-name {
+    flex-grow: 1; /* 名前の部分が伸びるように */
+    margin-right: 10px;
+}
+
+.item-list .delete-item-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 3px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.item-list .delete-item-button:hover {
+    background-color: #c0392b;
+}
+
+/* 合計日数表示用の .total-summary スタイルを追加します。 */
+/* ★★★ 以下の .total-summary スタイルを削除 ★★★ */
+/*
+.total-summary {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #ccc;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-align: right;
+}
+*/
+
+/* 履歴 */
+/* ... */
+
+/* 右パネル */
+.right-panel {
+    width: 45%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* 各セクション間のギャップ */
+}
+
+.roulette-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px; /* 下の要素とのマージン */
+}
+
+.roulette-button {
+    /* ... existing styles ... */
+}
+.roulette-button.active {
+   /* ... existing styles ... */
+}
+
+
+/* ★★★ 設定表示部 ★★★ */
+#config-viewer {
+    flex-grow: 1; /* ★ 利用可能な垂直スペースを占めるようにする */
+    /* display: flex; flex-direction: column; などが必要なら追加 */
+    min-height: 0; /* flexアイテムが縮小しすぎるのを防ぐ (重要) */
+}
+
+#config-viewer h4 {
+    margin-bottom: 10px;
+}
+
+/* 項目リスト */
+#config-viewer .item-list {
+    list-style: none;
+    padding: 0;
+    /* margin-bottom: 20px; */ /* ← 親の flex-grow で管理されるので不要かも */
+    max-height: 210px; /* 約5項目分 */
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    background-color: #fff; /* 背景色を明示 */
+}
+
+.item-list li {
+   /* ... existing styles ... */
+}
+
+.item-list .item-name {
+    /* ... existing styles ... */
+}
+
+.item-list .delete-item-button {
+    /* ... existing styles ... */
+}
+.item-list .delete-item-button:hover {
+    /* ... existing styles ... */
+}
+
+/* ★★★ 設定変更部 ★★★ */
+#config-modifier {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #fafafa;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* 新規ルーレット作成ボタン (config-modifier内に移動した場合) */
+#config-modifier #add-roulette {
+    /* 必要であればスタイル調整 */
+    align-self: flex-start; /* 左寄せにするなど */
+}
+
+
+/* 更新ボタン */
+#config-modifier #update-roulette-button {
+     /* align-self: flex-end; */ /* ← 削除 */
+}
+
+/* ★★★ 削除ボタン用のスタイル ★★★ */
+.btn-danger {
+    background-color: #e74c3c; /* 赤色背景 */
+    color: white;
+    border-color: #c0392b;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b; /* ホバー時少し暗く */
+    border-color: #a52e20;
+}
+
+/* 削除ボタンの位置調整 (任意) */
+#config-modifier #delete-roulette-button {
+    /* margin-top: 10px; */ /* ← 削除 (gapで調整) */
+    /* align-self: flex-end; */ /* ← 削除 */
+}
+
+/* ★★★ 新しいスタイル: 更新/削除ボタンコンテナ ★★★ */
+.config-actions {
+    display: flex;
+    justify-content: flex-end; /* ボタンを右に寄せる */
+    gap: 10px; /* ボタン間のスペース */
+    margin-top: 10px; /* 上の要素とのスペース */
+}
+
+/* 合計欄 */
+/* ... existing styles ... */
+
+/* ================================== */
+/*          レスポンシブ対応           */
+/* ================================== */
+
+/* タブレットサイズ程度 (例: 768px以下) */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px; /* コンテナの左右パディングを少し減らす */
+    }
+
+    .roulette {
+        /* 600px より少し大きい画面用に中間のサイズを追加 */
+        width: 380px;
+        height: 380px;
+        border-width: 8px;
+    }
+
+    .roulette-marker {
+        /* マーカーの位置も調整 */
+        top: -30px;
+        border-left-width: 10px;
+        border-right-width: 10px;
+        border-top-width: 35px;
+    }
+
+    /* 設定フォームの調整 */
+    .config-form {
+        /* flex-direction: column; */ /* ← 削除 (inline-group で制御) */
+        /* align-items: stretch; */  /* ← 不要なら削除 */
+    }
+
+    /* inline-group 内の要素の調整 */
+    .config-form-inline-group {
+        gap: 10px; /* 少し詰める */
+    }
+
+    .config-form .form-group {
+        /* justify-content: space-between; */ /* ← flex-growを使う場合は不要かも */
+        flex-grow: 1; /* フォームグループが伸びるように */
+        min-width: 180px; /* グループの最小幅 (折り返し制御) */
+    }
+
+    .config-form select,
+    .config-form input[type="number"] {
+        /* width: auto; */ /* ← form-group が伸びるので不要かも */
+        /* flex-grow: 1; */ /* ← これも form-group に移譲 */
+        max-width: none; /* 幅制限解除 */
+        width: 60px; /* ある程度の固定幅に戻す？ or auto */
+    }
+     .config-form input#item-value { /* 比率入力は少し広めに */
+         width: 80px;
+     }
+
+    /* 追加ボタンは右端に固定しない方が自然かも */
+     .config-form button.btn-small {
+         flex-shrink: 0; /* 縮まないように */
+     }
+
+    .config-actions {
+        /* justify-content: space-between; */ /* 右寄せのままの方が良いかも */
+    }
+}
+
+
+/* スマートフォンサイズ (例: 600px以下) - 既存のメディアクエリを強化 */
+@media (max-width: 600px) {
+    .container {
+        padding: 10px; /* さらにパディングを減らす */
+    }
+
+    h1 { font-size: 1.8em; }
+    h2 { font-size: 1.4em; }
+    h3 { font-size: 1.1em; }
+
+    .roulette {
+        width: 300px; /* 既存の指定より少し大きく調整 (画面幅に合わせる) */
+        height: 300px;
+        border-width: 6px;
+        margin-bottom: 15px;
+    }
+
+     .roulette-marker {
+        top: -25px;
+        border-left-width: 8px;
+        border-right-width: 8px;
+        border-top-width: 30px;
+    }
+
+    /* ルーレット内のラベルフォントサイズも調整 */
+    .section-label {
+         font-size: 12px !important; /* 重要度を上げて適用 */
+         /* (元々動的に設定されているが、小さくする方向に上書き) */
+    }
+
+    .btn {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+
+    #spin-button {
+        padding: 10px 25px;
+        font-size: 16px;
+    }
+
+    .roulette-buttons {
+        gap: 8px; /* ボタン間の隙間を少し詰める */
+    }
+    .roulette-button {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    /* 設定フォーム */
+    .config-form-inline-group {
+        gap: 8px;
+    }
+    .config-form .form-group {
+        min-width: 150px; /* さらに最小幅を調整 */
+    }
+
+    .config-form select,
+    .config-form input[type="number"] {
+        padding: 6px; /* 少しパディングを減らす */
+        font-size: 14px;
+        width: 50px; /* さらに幅調整 */
+    }
+    .config-form input#item-value {
+        width: 70px;
+    }
+
+    .config-form button.btn-small {
+         padding: 6px 10px;
+         font-size: 13px;
+    }
+
+    /* 項目リスト */
+    .item-list {
+        /* max-height: 120px; */ /* ★★★ この行を削除 ★★★ */
+    }
+    .item-list li {
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+    .item-list .delete-item-button {
+        padding: 2px 6px;
+        font-size: 11px;
+    }
+
+    /* 合計欄 */
+    .totals-header {
+        flex-direction: column; /* 縦積みに */
+        align-items: flex-start; /* 左寄せ */
+        gap: 10px;
+    }
+    .totals-header h3 {
+         text-align: left;
+    }
+    #totals {
+        gap: 8px;
+    }
+    .total-item {
+        font-size: 14px;
+        padding: 6px 10px;
+    }
+     #total-days-summary {
+         font-size: 1em; /* h3 と同じサイズに */
+     }
+
+    /* 履歴 */
+    details.history-container summary {
+        padding: 12px 15px 12px 25px; /* 左にマーカー用スペース確保 */
+        font-size: 1.1em;
+    }
+     details.history-container summary::before {
+         left: 8px;
+     }
+     .history-list {
+        padding: 0 10px 10px 10px;
+        max-height: 200px;
+     }
+     #history-list li {
+        padding: 6px 0;
+        font-size: 13px;
+     }
+
+} 
+
+/* ★★★ 開発者ツールセクション ★★★ */
+#developer-tools {
+    display: none; /* ★ デフォルトで非表示にする */
+    margin-top: 30px;
+    padding: 20px;
+    border: 2px dashed #f39c12;
+    border-radius: 8px;
+    background-color: #fffbeb;
+    flex-direction: column; /* display: flex が設定されたときに有効 */
+    gap: 20px;
+}
+
+#developer-tools h2 {
+    margin-bottom: 10px;
+    color: #d35400;
+}
+
+/* ★★★ 警告ボタン用のスタイル ★★★ */
+.btn-warning {
+    background-color: #f39c12; /* オレンジ色背景 */
+    color: white;
+    border-color: #e67e22;
+}
+
+.btn-warning:hover {
+    background-color: #e67e22; /* ホバー時少し暗く */
+    border-color: #d35400;
+}
+
+/* 完全リセットボタンの位置調整 (任意) */
+#developer-tools #full-reset-button {
+    margin-top: 10px;
+    align-self: flex-start; /* 左寄せ */
+}
+
+/* ★★★ 履歴 (details/summary ベース) ★★★ */
+details.history-container {
+    margin-top: 20px; /* 上の合計欄との間隔 */
+    padding: 0; /* details 自体のパディングは不要 */
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 5px;
+}
+
+details.history-container summary {
+    padding: 15px; /* summary部分のパディング */
+    font-weight: bold;
+    cursor: pointer;
+    list-style: none; /* デフォルトの三角マークを消す場合 */
+    position: relative; /* カスタムマーカー用 */
+    outline: none; /* クリック時の枠線を消す */
+}
+/* デフォルトの三角マーカーを消す (WebKit/Blink系) */
+details.history-container summary::-webkit-details-marker {
+  display: none;
+}
+/* Firefox 用 */
+details.history-container summary::marker {
+    display: none;
+}
+
+/* カスタム開閉マーカー (例: + / - ) */
+details.history-container summary::before {
+    content: '+'; /* 閉じている時のマーカー */
+    position: absolute;
+    left: 5px; /* 左端からの位置 */
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2em;
+    color: #999;
+    margin-right: 8px; /* マーカーとテキストの間隔 */
+}
+details.history-container[open] summary::before {
+    content: '−'; /* 開いている時のマーカー */
+}
+
+/* 履歴リスト (details 内) */
+.history-list {
+    list-style: none;
+    padding: 0 15px 15px 15px; /* summary下のリスト部分のパディング */
+    margin: 0;
+    max-height: 300px; /* スクロール高さ */
+    overflow-y: auto;
+    border-top: 1px dashed #eee; /* summaryとの境界線 */
+}
+
+#history-list li {
+    padding: 8px 0; /* 上下パディング */
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+    color: #555;
+}
+
+#history-list li:last-child {
+    border-bottom: none;
+}
+
+/* ================================== */
+/*          レスポンシブ対応           */
+/* ================================== */
+
+/* ... */
+
+/* スマートフォンサイズ (例: 600px以下) */
+@media (max-width: 600px) {
+    /* ... 他のスタイル ... */
+
+    /* 履歴 */
+    details.history-container summary {
+        padding: 12px 15px 12px 25px; /* 左にマーカー用スペース確保 */
+        font-size: 1.1em;
+    }
+     details.history-container summary::before {
+         left: 8px;
+     }
+     .history-list {
+        padding: 0 10px 10px 10px;
+        max-height: 200px;
+     }
+     #history-list li {
+        padding: 6px 0;
+        font-size: 13px;
+     }
+
+} 

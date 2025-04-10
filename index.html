@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>禁酒企画ルーレット</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>禁酒企画ルーレット</h1>
+        
+        <div class="roulette-container">
+            <div class="roulette" id="roulette">
+                <div class="roulette-inner" id="roulette-inner"></div>
+                <div class="roulette-marker"></div>
+                <div class="roulette-angle-markers"></div>
+                <div class="angle-tick"></div>
+                <div class="angle-0">0°</div>
+                <div class="angle-45">45°</div>
+                <div class="angle-90">90°</div>
+                <div class="angle-135">135°</div>
+                <div class="angle-180">180°</div>
+                <div class="angle-225">225°</div>
+                <div class="angle-270">270°</div>
+                <div class="angle-315">315°</div>
+            </div>
+            <button id="spin-button" class="btn">回す</button>
+        </div>
+        
+        <div class="result-container">
+            <h2>結果: <span id="result">-</span></h2>
+            <div class="counters">
+                <div class="totals-header">
+                    <h3 id="totals-title">合計<span id="total-days-summary"></span></h3>
+                    <button id="reset-totals-button" class="btn btn-small btn-secondary">リセット</button>
+                </div>
+                <div id="totals"></div>
+            </div>
+        </div>
+        
+        <div class="config-container">
+            <h2>ルーレット設定</h2>
+            <div class="roulette-buttons" id="roulette-buttons">
+                <!-- ボタンが動的に追加されます -->
+                <button class="roulette-button active" data-name="default">デフォルト</button>
+            </div>
+            <div id="config-viewer">
+                <h4>現在の項目:</h4>
+                <ul id="item-list" class="item-list">
+                    <!-- 項目がここに追加されます -->
+                </ul>
+            </div>
+
+            <!-- ★★★ 開発者ツールセクション (デフォルト非表示) ★★★ -->
+            <div id="developer-tools">
+                <h2>開発者ツール</h2>
+
+                <!-- 設定変更部を移動 -->
+                <div id="config-modifier">
+                    <button id="add-roulette" class="btn">新規ルーレット作成</button>
+                    <div class="config-form">
+                        <div class="config-form-inline-group">
+                            <div class="form-group">
+                                <label for="item-type">種類:</label>
+                                <select id="item-type">
+                                    <option value="+" selected>+</option>
+                                    <option value="-">-</option>
+                                </select>
+                                <input type="number" id="item-days" min="0" step="1" placeholder="日数"> 日
+                            </div>
+                            <div class="form-group">
+                                <label for="item-value">比率:</label>
+                                <input type="number" id="item-value" min="1" step="1" placeholder="例: 50"> ％
+                            </div>
+                            <button id="add-item-button" class="btn btn-small">項目追加</button>
+                        </div>
+                    </div>
+                    <div class="config-actions">
+                        <button id="update-roulette-button" class="btn">この内容でルーレットを更新</button>
+                        <button id="delete-roulette-button" class="btn btn-danger" style="display: none;">現在のルーレットを削除</button>
+                    </div>
+                </div>
+
+                <!-- ★★★ 完全リセットボタンを再追加 ★★★ -->
+                <button id="full-reset-button" class="btn btn-warning">完全リセット (開発用)</button>
+
+            </div>
+            <!-- ★★★ ここまで開発者ツールセクション ★★★ -->
+
+        </div> <!-- ★★★ .config-container の閉じタグ ★★★ -->
+
+        <!-- ★★★ 履歴表示を details/summary に変更し、開発者ツールの外に移動 ★★★ -->
+        <details class="history-container counters">
+            <summary>履歴</summary> <!-- 見出し -->
+            <ul id="history-list" class="history-list">
+                <!-- 履歴項目がここに追加されます -->
+            </ul>
+        </details>
+
+    </div> <!-- ★★★ メインの .container の閉じタグ ★★★ -->
+
+    <script src="script.js"></script>
+</body>
+</html> 
