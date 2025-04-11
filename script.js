@@ -112,7 +112,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // window.addEventListener('hashchange', checkAndShowDeveloperTools);
 
     // イベントリスナー
-    spinButton.addEventListener('click', spinRoulette);
+    spinButton.addEventListener('click', async () => {
+        // 連続スピン中は再度クリックできないように設定
+        if (spinning) return;
+        spinning = true;
+        spinButton.disabled = true;
+        for (let i = 0; i < spinCount; i++) {
+            await spinRoulette();
+            // 各スピン間に短い間隔（例:300ms）を挟む
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        spinning = false;
+        spinButton.disabled = false;
+    });
     addRouletteBtn.addEventListener('click', handleAddRoulette);
     resetTotalsButton.addEventListener('click', handleResetTotals);
     addItemButton.addEventListener('click', handleAddItem);
@@ -600,9 +612,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateHistoryDisplay() {
         historyList.innerHTML = '';
         
-        history.forEach(item => {
+        history.forEach((item, index) => {
             const li = document.createElement('li');
-            li.textContent = `${item.time}: ${item.result}`;
+            const span = document.createElement('span');
+            span.className = 'history-text';
+            span.textContent = `${item.time}: ${item.result}`;
+            
+            if (item.deleted) {
+                li.style.textDecoration = 'line-through';
+            } else {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '削除';
+                deleteBtn.className = 'delete-history-button';
+                deleteBtn.dataset.index = index;
+                li.appendChild(deleteBtn);
+            }
+            li.insertBefore(span, li.firstChild);
             historyList.appendChild(li);
         });
     }
@@ -792,9 +817,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ルーレット回転処理を async 関数に変更
     async function spinRoulette() {
-        if (spinning) return;
-        spinning = true;
-        spinButton.disabled = true;
         resultElement.textContent = '-';
 
         // 現在の角度取得とリセット
@@ -804,35 +826,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         rouletteInner.style.transform = `rotate(${resetAngle}deg)`;
         await new Promise(resolve => requestAnimationFrame(resolve));
         await new Promise(resolve => requestAnimationFrame(resolve));
+        if (window.location.hash === '#dev') {
+            const baseRotation = -360 * 5; // 5回転分
+            const randomAngle = Math.random() * 360; // 0～360° の乱数
+            const finalTargetAngle = baseRotation + randomAngle;
+            rouletteInner.style.transition = 'none';
+            rouletteInner.style.transform = `rotate(${finalTargetAngle}deg)`;
 
-        // 以下の方針：
-        // ① 基本回転として5回転（例：-360×5）を設定
-        // ② その上で 0～360° の乱数を加算し、最終的な回転角度（CSS での回転は CCW）とする
-        // ③ 結果判定は、ルーレットの一番上（すなわち 12時方向、標準極座標で 270°）を基準に判定する
-        const baseRotation = -360 * 5; // 5回転分
-        const randomAngle = Math.random() * 360; // 0～360° の乱数
-        // ※ ここで最終的な回転角度は基礎回転 + (乱数で得た角度)
-        //    「middleAngle」は、当選扇形の中央角度 (0～360, CW 表記) を後述の createRouletteDisplay 内で算出して各扇形に保持しているものとは独立です。
-        //    今回は「結果」に合わせるのではなく、乱数で最終角度を決定します。
-        // マーカーはルーレット上部 (12時方向) となるよう、標準極座標で 270° とします。
-        const MARKER_POSITION = 270; // ← これを 270° に設定することで、上部が当選基準となる
-        // 目標となる「中間扇形がどこに来るか」を算出するため、以下の式とします。
-        // ここでは、乱数により得られた最終角度から、針位置（270°）に合わせるための相対角度を計算します。
-        // ※ 今回は結果を乱数（角度）で決定するため、直接目標角度として採用します
-        const finalTargetAngle = baseRotation + randomAngle;
-        console.log(`ランダムに選択された最終角度: ${finalTargetAngle.toFixed(2)}deg (基準: 上部 270°)`);
-
-        // アニメーション設定：2秒に延長し、より滑らかなイージング関数を使用
-        rouletteInner.style.transition = 'transform 2s cubic-bezier(0.25, 1, 0.5, 1)';
-        rouletteInner.style.transform = `rotate(${finalTargetAngle}deg)`;
-
-        // transitionend イベントでアニメーション終了後の処理
-        rouletteInner.addEventListener('transitionend', () => {
             const actualRotation = getRotationDegrees(rouletteInner);
             const normRotation = ((actualRotation % 360) + 360) % 360;
-            // マーカー位置（上部 = 270°）に対する見かけ上の角度は以下のように算出
+            const MARKER_POSITION = 270;
             const markerAngle = (MARKER_POSITION - normRotation + 360) % 360;
-            // 各扇形（.roulette-section）の data-* 属性に記録した角度情報 (CW 表記)
             let determinedResult = null;
             document.querySelectorAll('.roulette-section').forEach(section => {
                 const secStart = parseFloat(section.dataset.startAngle);
@@ -845,30 +849,74 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.warn("角度から当選項目が判定できませんでした。フォールバックとして default を使用します。");
                 determinedResult = "default";
             }
-            console.log(`transitionend: 実際の回転: ${actualRotation.toFixed(2)}deg, 正規化: ${normRotation.toFixed(2)}deg, マーカー角度: ${markerAngle.toFixed(2)}deg`);
-            console.log(`当選（角度）: ${determinedResult}`);
-
             resultElement.textContent = determinedResult;
             if (!totals[determinedResult]) totals[determinedResult] = 0;
             totals[determinedResult]++;
             saveTotals();
             updateTotalsDisplay();
-
             const timestamp = new Date().toLocaleString();
             history.unshift({ time: timestamp, result: determinedResult });
             if (history.length > 100) history.pop();
             saveHistory();
             updateHistoryDisplay();
-
-            // ラベルが常に水平になるよう回転補正
             const compensatingRotation = -actualRotation;
             document.querySelectorAll('.section-label').forEach(label => {
                 label.style.transform = `translate(-50%, -50%) rotate(${compensatingRotation}deg)`;
             });
-
             spinning = false;
             spinButton.disabled = false;
-        }, { once: true });
+            return;
+        } else {
+            const baseRotation = -360 * 5; // 5回転分
+            const randomAngle = Math.random() * 360; // 0～360° の乱数
+            const finalTargetAngle = baseRotation + randomAngle;
+            console.log(`ランダムに選択された最終角度: ${finalTargetAngle.toFixed(2)}deg (基準: 上部 270°)`);
+            rouletteInner.style.transition = 'transform 2s cubic-bezier(0.25, 1, 0.5, 1)';
+            rouletteInner.style.transform = `rotate(${finalTargetAngle}deg)`;
+ 
+            let transitionHandled = false;
+            const onTransitionEnd = () => {
+                if (transitionHandled) return;
+                transitionHandled = true;
+                const actualRotation = getRotationDegrees(rouletteInner);
+                const normRotation = ((actualRotation % 360) + 360) % 360;
+                const MARKER_POSITION = 270;
+                const markerAngle = (MARKER_POSITION - normRotation + 360) % 360;
+                let determinedResult = null;
+                document.querySelectorAll('.roulette-section').forEach(section => {
+                    const secStart = parseFloat(section.dataset.startAngle);
+                    const secEnd = parseFloat(section.dataset.endAngle);
+                    if (isAngleBetween(markerAngle, secStart, secEnd)) {
+                        determinedResult = section.dataset.item;
+                    }
+                });
+                if (!determinedResult) {
+                    console.warn("角度から当選項目が判定できませんでした。フォールバックとして default を使用します。");
+                    determinedResult = "default";
+                }
+                console.log(`transitionend: 実際の回転: ${actualRotation.toFixed(2)}deg, 正規化: ${normRotation.toFixed(2)}deg, マーカー角度: ${markerAngle.toFixed(2)}deg`);
+                resultElement.textContent = determinedResult;
+                if (!totals[determinedResult]) totals[determinedResult] = 0;
+                totals[determinedResult]++;
+                saveTotals();
+                updateTotalsDisplay();
+                const timestamp = new Date().toLocaleString();
+                history.unshift({ time: timestamp, result: determinedResult });
+                if (history.length > 100) history.pop();
+                saveHistory();
+                updateHistoryDisplay();
+                const compensatingRotation = -actualRotation;
+                document.querySelectorAll('.section-label').forEach(label => {
+                    label.style.transform = `translate(-50%, -50%) rotate(${compensatingRotation}deg)`;
+                });
+                spinning = false;
+                spinButton.disabled = false;
+            };
+ 
+            rouletteInner.addEventListener('transitionend', onTransitionEnd, { once: true });
+            // フォールバックとして、2.1秒後に transitionend が発火していなければ onTransitionEnd を強制実行
+            setTimeout(onTransitionEnd, 2100);
+        }
     }
 
     // --- ★★★ handleAddRoulette 関数を再実装 ★★★ ---
@@ -1020,12 +1068,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // totals 変数から内訳を組み立てる（各項目の禁酒回数）
-        var breakdown = "";
+        var items = [];
         for (var key in totals) {
             if (totals.hasOwnProperty(key)) {
-                breakdown += key + " : " + totals[key] + "回\n";
+                var count = totals[key];
+                var parsed = parseKeyString(key);
+                items.push({ key: key, count: count, parsed: parsed });
             }
         }
+        items.sort(function(a, b) {
+            if (a.parsed && b.parsed) {
+                var effectiveA = (a.parsed.type === '+' ? a.parsed.days : -a.parsed.days);
+                var effectiveB = (b.parsed.type === '+' ? b.parsed.days : -b.parsed.days);
+                return effectiveB - effectiveA;
+            } else if (a.parsed) {
+                return -1;
+            } else if (b.parsed) {
+                return 1;
+            } else {
+                return a.key.localeCompare(b.key);
+            }
+        });
+        var breakdown = "";
+        items.forEach(function(item) {
+            breakdown += item.key + " : " + item.count + "回\n";
+        });
 
         // 今日から days 日後の日付を計算
         var today = new Date();
@@ -1034,11 +1101,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         var date = endDate.getDate();
 
         // ツイート内容の作成：内訳と合計、禁酒終了日を含める
-        var tweetMsg = "禁酒結果\n" + breakdown + "\n合計: " + totalText + "\n今日から" + month + "月" + date + "日まで禁酒します！";
+        var tweetMsg = "禁酒結果\n" + breakdown + "\n合計: " + totalText + "\n○○さんは、今日から" + month + "月" + date + "日まで禁酒します！";
         var twitterUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
         window.open(twitterUrl, "_blank");
     }
 
     // ツイートボタンにクリックイベントを設定
     document.getElementById('tweet-button').addEventListener('click', handleTweetButtonClick);
+
+    // 新規追加: 履歴項目の削除処理
+    function handleDeleteHistoryItem(index) {
+        const item = history[index];
+        if (item && !item.deleted) {
+            item.deleted = true;
+            // 対応する totals のカウントを減少
+            if (totals[item.result] && totals[item.result] > 0) {
+                totals[item.result]--;
+                if (totals[item.result] <= 0) {
+                    delete totals[item.result];
+                }
+            }
+            saveHistory();
+            saveTotals();
+            updateHistoryDisplay();
+            updateTotalsDisplay();
+        }
+    }
+
+    // 履歴リスト上で削除ボタンがクリックされた場合のイベントリスナー追加
+    historyList.addEventListener('click', function(event) {
+        if (event.target.classList.contains('delete-history-button')) {
+            const index = parseInt(event.target.dataset.index, 10);
+            handleDeleteHistoryItem(index);
+        }
+    });
+
+    // 新規追加: 回数を管理する変数と関数
+    let spinCount = 1;
+    const spinCountDisplay = document.getElementById('spin-count-display');
+    function updateSpinButtonText() {
+        spinCountDisplay.textContent = spinCount;
+    }
+    updateSpinButtonText();
+
+    spinCountDisplay.addEventListener('click', () => {
+        const input = prompt("何回回しますか？", spinCount);
+        const newCount = parseInt(input, 10);
+        if (!isNaN(newCount) && newCount > 0) {
+            spinCount = newCount;
+            updateSpinButtonText();
+        }
+    });
 }); 
