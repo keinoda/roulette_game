@@ -507,8 +507,8 @@ h1, h2, h3 {
     list-style: none;
     padding: 0;
     margin-bottom: 20px;
-    max-height: 200px; /* 多くなった場合にスクロール */
-    overflow-y: auto;
+    max-height: none !important;
+    overflow-y: visible !important;
     border: 1px solid #eee;
     border-radius: 5px;
 }
@@ -536,12 +536,28 @@ h1, h2, h3 {
     color: white;
     border: none;
     padding: 3px 8px;
-    font-size: 12px;
-    cursor: pointer;
     border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
 }
+
 .item-list .delete-item-button:hover {
     background-color: #c0392b;
+}
+
+/* 修正ボタンのスタイル */
+.item-list .edit-item-button {
+    background-color: #3498db;  /* 青色ベース */
+    color: white;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.item-list .edit-item-button:hover {
+    background-color: #2980b9;  /* ホバー時の濃い青 */
 }
 
 /* 合計日数表示用の .total-summary スタイルを追加します。 */
@@ -599,12 +615,12 @@ h1, h2, h3 {
 #config-viewer .item-list {
     list-style: none;
     padding: 0;
-    /* margin-bottom: 20px; */ /* ← 親の flex-grow で管理されるので不要かも */
-    max-height: 210px; /* 約5項目分 */
-    overflow-y: auto;
+    margin-bottom: 0;
+    max-height: none !important;
+    overflow-y: visible !important;
     border: 1px solid #eee;
     border-radius: 5px;
-    background-color: #fff; /* 背景色を明示 */
+    background-color: #fff;
 }
 
 .item-list li {
@@ -736,6 +752,12 @@ h1, h2, h3 {
     .config-actions {
         /* justify-content: space-between; */ /* 右寄せのままの方が良いかも */
     }
+
+    /* 項目リスト */
+    .item-list {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
 }
 
 
@@ -756,7 +778,7 @@ h1, h2, h3 {
         margin-bottom: 15px;
     }
 
-     .roulette-marker {
+    .roulette-marker {
         top: -25px;
         border-left-width: 8px;
         border-right-width: 8px;
@@ -765,8 +787,8 @@ h1, h2, h3 {
 
     /* ルーレット内のラベルフォントサイズも調整 */
     .section-label {
-         font-size: 12px !important; /* 重要度を上げて適用 */
-         /* (元々動的に設定されているが、小さくする方向に上書き) */
+        font-size: 12px !important; /* 重要度を上げて適用 */
+        /* (元々動的に設定されているが、小さくする方向に上書き) */
     }
 
     .btn {
@@ -806,19 +828,21 @@ h1, h2, h3 {
     }
 
     .config-form button.btn-small {
-         padding: 6px 10px;
-         font-size: 13px;
+        padding: 6px 10px;
+        font-size: 13px;
     }
 
     /* 項目リスト */
     .item-list {
-        /* max-height: 120px; */ /* ★★★ この行を削除 ★★★ */
+        max-height: none !important;
+        overflow-y: visible !important;
     }
     .item-list li {
         padding: 8px 10px;
         font-size: 14px;
     }
-    .item-list .delete-item-button {
+    .item-list .delete-item-button,
+    .item-list .edit-item-button {
         padding: 2px 6px;
         font-size: 11px;
     }
@@ -830,7 +854,7 @@ h1, h2, h3 {
         gap: 10px;
     }
     .totals-header h3 {
-         text-align: left;
+        text-align: left;
     }
     #totals {
         gap: 8px;
@@ -839,28 +863,27 @@ h1, h2, h3 {
         font-size: 14px;
         padding: 6px 10px;
     }
-     #total-days-summary {
-         font-size: 1em; /* h3 と同じサイズに */
-     }
+    #total-days-summary {
+        font-size: 1em; /* h3 と同じサイズに */
+    }
 
     /* 履歴 */
     details.history-container summary {
         padding: 12px 15px 12px 25px; /* 左にマーカー用スペース確保 */
         font-size: 1.1em;
     }
-     details.history-container summary::before {
-         left: 8px;
-     }
-     .history-list {
+    details.history-container summary::before {
+        left: 8px;
+    }
+    .history-list {
         padding: 0 10px 10px 10px;
         max-height: 200px;
-     }
-     #history-list li {
+    }
+    #history-list li {
         padding: 6px 0;
         font-size: 13px;
-     }
-
-} 
+    }
+}
 
 /* ★★★ 開発者ツールセクション ★★★ */
 #developer-tools {
@@ -967,23 +990,14 @@ details.history-container[open] summary::before {
 
 /* スマートフォンサイズ (例: 600px以下) */
 @media (max-width: 600px) {
-    /* ... 他のスタイル ... */
+    /* ... existing code ... */
 
-    /* 履歴 */
-    details.history-container summary {
-        padding: 12px 15px 12px 25px; /* 左にマーカー用スペース確保 */
-        font-size: 1.1em;
+    /* 項目リスト */
+    .item-list {
+        max-height: none !important;
+        overflow-y: visible !important;
     }
-     details.history-container summary::before {
-         left: 8px;
-     }
-     .history-list {
-        padding: 0 10px 10px 10px;
-        max-height: 200px;
-     }
-     #history-list li {
-        padding: 6px 0;
-        font-size: 13px;
-     }
-
-} 
+    
+    /* ... existing code ... */
+}
+/* ... existing code ... */ 

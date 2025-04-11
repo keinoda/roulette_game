@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     resetTotalsButton.addEventListener('click', handleResetTotals);
     addItemButton.addEventListener('click', handleAddItem);
     updateRouletteButton.addEventListener('click', handleUpdateRoulette);
-    itemList.addEventListener('click', handleDeleteItem);
+    itemList.addEventListener('click', handleEditItem);
     deleteRouletteButton.addEventListener('click', handleDeleteRoulette);
     fullResetButton.addEventListener('click', handleFullReset);
 
@@ -358,6 +358,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 項目リスト表示を更新
     function renderItemList() {
         itemList.innerHTML = ''; // いったんクリア
+        
+        // 開発者モードかどうかをチェック
+        const isDevMode = window.location.hash === '#dev';
+        
         currentConfigItems.forEach((item, index) => {
             const li = document.createElement('li');
 
@@ -369,12 +373,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 表示文字列: 例 "+3日（比率：50％）"
             const displayString = `${keyString}（比率：${item.value}％）`;
 
-            li.innerHTML = `
-                <span class="item-name">${displayString}</span>
-                <button class="delete-item-button" data-index="${index}">削除</button>
-            `;
+            // 開発者モードの場合のみ修正ボタンを表示
+            if (isDevMode) {
+                li.innerHTML = `
+                    <span class="item-name">${displayString}</span>
+                    <button class="edit-item-button" data-index="${index}">修正</button>
+                `;
+            } else {
+                li.innerHTML = `
+                    <span class="item-name">${displayString}</span>
+                `;
+            }
+            
             itemList.appendChild(li);
         });
+    }
+
+    // 項目削除ボタンの処理 (イベント委任)
+    function handleDeleteItem(event) {
+        if (event.target.classList.contains('delete-item-button')) {
+            const index = parseInt(event.target.dataset.index, 10);
+            if (!isNaN(index) && index >= 0 && index < currentConfigItems.length) {
+                currentConfigItems.splice(index, 1); // 配列から削除
+                renderItemList(); // リスト表示を更新
+            }
+        }
+    }
+
+    // 項目修正ボタンの処理 (イベント委任)
+    function handleEditItem(event) {
+        if (event.target.classList.contains('edit-item-button')) {
+            const index = parseInt(event.target.dataset.index, 10);
+            if (!isNaN(index) && index >= 0 && index < currentConfigItems.length) {
+                const item = currentConfigItems[index];
+                
+                // フォームに値をセット
+                itemTypeSelect.value = item.type;
+                itemDaysInput.value = item.days;
+                itemValueInput.value = item.value;
+                
+                // 編集中の項目インデックスを保持
+                itemTypeSelect.dataset.editIndex = index;
+                
+                // 追加ボタンのテキストを「更新」に変更
+                addItemButton.textContent = '更新';
+                
+                // 入力欄にフォーカス
+                itemDaysInput.focus();
+            }
+        }
     }
 
     // 項目追加ボタンの処理
@@ -382,6 +429,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const type = itemTypeSelect.value;
         const days = parseInt(itemDaysInput.value, 10);
         const value = parseInt(itemValueInput.value, 10);
+        
+        // 編集中のインデックスを取得
+        const editIndex = parseInt(itemTypeSelect.dataset.editIndex, 10);
+        const isEditing = !isNaN(editIndex) && editIndex >= 0 && editIndex < currentConfigItems.length;
 
         // 入力チェック
         if (isNaN(days) || days < 0) {
@@ -396,32 +447,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 項目キーを作成
         const keyString = `${type}${days}日`;
 
-        // 同じキーが既にないかチェック (任意: 上書きや警告も可)
-        // if (currentConfigItems.some(item => `${item.type}${item.days}日` === keyString)) {
-        //     alert('同じ日数の項目が既に存在します。');
-        //     return;
-        // }
+        // 同一キーの重複チェック（編集中の項目自身を除く）
+        const hasDuplicate = currentConfigItems.some((item, index) => {
+            if (isEditing && index === editIndex) return false; // 編集中の項目自身は無視
+            return `${item.type}${item.days}日` === keyString;
+        });
+        
+        if (hasDuplicate) {
+            alert(`同じ日数の項目「${keyString}」がすでに存在します。`);
+            return;
+        }
 
-        // 一時データに追加
-        currentConfigItems.push({ type, days, value });
+        if (isEditing) {
+            // 既存項目の更新
+            currentConfigItems[editIndex] = { type, days, value };
+        } else {
+            // 新規項目の追加
+            currentConfigItems.push({ type, days, value });
+        }
+        
         renderItemList(); // リスト表示を更新
 
         // 入力欄をクリア
         itemDaysInput.value = '';
         itemValueInput.value = '';
         itemTypeSelect.value = '+'; // デフォルトに戻す
+        
+        // 編集モードをリセット
+        delete itemTypeSelect.dataset.editIndex;
+        addItemButton.textContent = '項目追加';
+        
         itemDaysInput.focus(); // 次の入力へ
-    }
-
-    // 項目削除ボタンの処理 (イベント委任)
-    function handleDeleteItem(event) {
-        if (event.target.classList.contains('delete-item-button')) {
-            const index = parseInt(event.target.dataset.index, 10);
-            if (!isNaN(index) && index >= 0 && index < currentConfigItems.length) {
-                currentConfigItems.splice(index, 1); // 配列から削除
-                renderItemList(); // リスト表示を更新
-            }
-        }
     }
 
     // ルーレット更新ボタンの処理
@@ -487,42 +543,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('ルーレットを更新しました。');
     }
 
-    // 合計表示の更新
+    // --- 合計表示の更新 (ソート追加) ---
     function updateTotalsDisplay() {
         totalsElement.innerHTML = ''; // いったんクリア
-        let totalDaysSum = 0; // 合計日数の初期化
-        
-        // 各項目のカウントを表示し、日数を集計
+        let totalDaysSum = 0;
+
+        // totals オブジェクトからアイテム配列を作成
+        const items = [];
         for (const key in totals) {
             const count = totals[key];
-            const item = document.createElement('div');
-            item.className = 'total-item';
-
-            // 日数をパース
-            const parsedKey = parseKeyString(key);
-            if (parsedKey) {
-                const daysValue = parsedKey.days;
-                const countValue = typeof count === 'number' ? count : 0;
-                if (parsedKey.type === '+') {
-                    totalDaysSum += daysValue * countValue;
-                } else {
-                    totalDaysSum -= daysValue * countValue;
-                }
-                // 記号と数字を半角で表示
-                const typeSymbol = parsedKey.type === '+' ? '+' : '-';
-                item.textContent = `${typeSymbol}${daysValue}日: ${countValue}回`;
-            } else {
-                // パースできないキー（例: "禁酒継続" など）もそのまま表示
-                item.textContent = `${key}: ${count}回`;
-            }
-
-            totalsElement.appendChild(item);
+            const parsed = parseKeyString(key);
+            items.push({ key, count, parsed });
         }
 
-        // 合計日数を表示（数字と記号は半角に）
+        // 各項目の有効な日数を (符号付き) で計算し、降順にソートする
+        items.sort((a, b) => {
+            if (a.parsed && b.parsed) {
+                const effectiveA = (a.parsed.type === '+' ? a.parsed.days : -a.parsed.days);
+                const effectiveB = (b.parsed.type === '+' ? b.parsed.days : -b.parsed.days);
+                return effectiveB - effectiveA; // 降順にソート
+            } else if (a.parsed) {
+                return -1;
+            } else if (b.parsed) {
+                return 1;
+            } else {
+                return a.key.localeCompare(b.key);
+            }
+        });
+
+        // ソートされたアイテムを表示
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'total-item';
+            if (item.parsed && typeof item.count === 'number') {
+                const daysValue = item.parsed.days;
+                const typeSymbol = item.parsed.type === '+' ? '+' : '-';
+                if (item.parsed.type === '+') {
+                    totalDaysSum += daysValue * item.count;
+                } else {
+                    totalDaysSum -= daysValue * item.count;
+                }
+                div.textContent = `${typeSymbol}${daysValue}日: ${item.count}回`;
+            } else {
+                div.textContent = `${item.key}: ${item.count}回`;
+            }
+            totalsElement.appendChild(div);
+        });
+
+        // 合計日数を表示
         const sumPrefix = totalDaysSum >= 0 ? '+' : '-';
         const absSumDays = Math.abs(totalDaysSum);
-        // 見出し横のspanにテキストを設定（数字と記号は半角）
         totalDaysSummarySpan.textContent = `：${sumPrefix}${absSumDays}日`;
     }
 
@@ -932,4 +1002,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // ★ 初期化時にマーカーを描画 (例) ★
     // debugDrawMarker();
+
+    // ツイートボタンのクリックハンドラを追加
+    function handleTweetButtonClick() {
+        // total-days-summary に表示されているテキストから禁酒合計日数を抽出（例: "：+7日"）
+        var totalDaysElement = document.getElementById('total-days-summary');
+        var totalText = totalDaysElement.textContent || "";
+        var match = totalText.match(/([+-]?\d+)/);
+        if (!match) {
+            alert('禁酒日数を取得できませんでした。');
+            return;
+        }
+        var days = parseInt(match[1], 10);
+        if (isNaN(days) || days <= 0) {
+            alert('有効な禁酒日数がありません。');
+            return;
+        }
+
+        // totals 変数から内訳を組み立てる（各項目の禁酒回数）
+        var breakdown = "";
+        for (var key in totals) {
+            if (totals.hasOwnProperty(key)) {
+                breakdown += key + " : " + totals[key] + "回\n";
+            }
+        }
+
+        // 今日から days 日後の日付を計算
+        var today = new Date();
+        var endDate = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+        var month = endDate.getMonth() + 1;
+        var date = endDate.getDate();
+
+        // ツイート内容の作成：内訳と合計、禁酒終了日を含める
+        var tweetMsg = "禁酒結果\n" + breakdown + "\n合計: " + totalText + "\n今日から" + month + "月" + date + "日まで禁酒します！";
+        var twitterUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
+        window.open(twitterUrl, "_blank");
+    }
+
+    // ツイートボタンにクリックイベントを設定
+    document.getElementById('tweet-button').addEventListener('click', handleTweetButtonClick);
 }); 
