@@ -694,9 +694,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             return; // キャンセルされたら何もしない
         }
 
+        // Mark all existing history items as deleted (line-through)
+        history.forEach(item => {
+            item.deleted = true;
+        });
+
         // 履歴にリセット記録を追加
         const timestamp = new Date().toLocaleString();
-        history.unshift({ time: timestamp, result: '合計をリセットしました' });
+        history.unshift({ time: timestamp, result: '合計をリセットしました', deleted: false });
         if (history.length > 100) { // 履歴上限は維持
             history.pop();
         }
