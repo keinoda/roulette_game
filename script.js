@@ -72,11 +72,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- ここまで初期化処理 ---
 
     // --- グローバル変数 (roulettes, currentRoulette など) ---
-    let roulettes = {}; // ★ 初期化を空にする (initializeで設定される)
-    let currentRoulette = 'default'; // デフォルトは固定
+    let roulettes = {};
+    let currentRoulette = 'default';
     let spinning = false;
-    let totals = loadTotals(); // totals, history は従来通りlocalStorageから
+    let totals = loadTotals();
     let history = loadHistory();
+    let rouletteSpinCounts = loadRouletteSpinCounts(); // ★ 追加: ルーレットごとの回転数
 
     // --- 一時的な設定データ (リスト表示用) ---
     let currentConfigItems = [];
@@ -117,13 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (spinning) return;
         spinning = true;
         spinButton.disabled = true;
-        for (let i = 0; i < spinCount; i++) {
-            await spinRoulette();
-            // 各スピン間に短い間隔（例:300ms）を挟む
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-        spinning = false;
-        spinButton.disabled = false;
+        await spinRoulette();
     });
     addRouletteBtn.addEventListener('click', handleAddRoulette);
     resetTotalsButton.addEventListener('click', handleResetTotals);
@@ -162,6 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                  firstButton.click(); // クリックイベントを発火させて状態を更新
              }
         }
+        updateCurrentRouletteSpinCountDisplay(); // ★ 初期回転数を表示
     }
 
     // ボタンクリックハンドラ（共通処理）
@@ -182,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadCurrentRouletteConfig();
         createRouletteDisplay();
         toggleDeleteButtonVisibility();
+        updateCurrentRouletteSpinCountDisplay(); // ★ 回転数表示を更新
     }
 
     // ルーレットボタンを追加
@@ -557,18 +554,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 合計表示の更新 (ソート追加) ---
     function updateTotalsDisplay() {
-        totalsElement.innerHTML = ''; // いったんクリア
+        totalsElement.innerHTML = ''; // 各項目のリスト表示エリアをクリア
         let totalDaysSum = 0;
 
-        // totals オブジェクトからアイテム配列を作成
+        // totals オブジェクトからアイテム配列を作成しソート
         const items = [];
         for (const key in totals) {
             const count = totals[key];
             const parsed = parseKeyString(key);
             items.push({ key, count, parsed });
+            // ★ 合計日数をここで計算しておく
+            if (parsed && typeof count === 'number') {
+                const daysValue = parsed.days;
+                if (parsed.type === '+') {
+                    totalDaysSum += daysValue * count;
+                } else {
+                    totalDaysSum -= daysValue * count;
+                }
+            }
         }
-
-        // 各項目の有効な日数を (符号付き) で計算し、降順にソートする
         items.sort((a, b) => {
             if (a.parsed && b.parsed) {
                 const effectiveA = (a.parsed.type === '+' ? a.parsed.days : -a.parsed.days);
@@ -583,29 +587,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // ソートされたアイテムを表示
+        // ソートされたアイテムを totalsElement に表示
         items.forEach(item => {
             const div = document.createElement('div');
             div.className = 'total-item';
             if (item.parsed && typeof item.count === 'number') {
                 const daysValue = item.parsed.days;
                 const typeSymbol = item.parsed.type === '+' ? '+' : '-';
-                if (item.parsed.type === '+') {
-                    totalDaysSum += daysValue * item.count;
-                } else {
-                    totalDaysSum -= daysValue * item.count;
-                }
+                // 合計日数の計算はループの先頭で行うように移動
                 div.textContent = `${typeSymbol}${daysValue}日: ${item.count}回`;
             } else {
                 div.textContent = `${item.key}: ${item.count}回`;
             }
-            totalsElement.appendChild(div);
+            totalsElement.appendChild(div); // リストに追加
         });
 
-        // 合計日数を表示
+        // ★ 合計日数と合計回転数を専用のSpanに表示 ★
+        const totalDaysSummarySpan = document.getElementById('total-days-summary'); // HTML内の既存のSpanを取得
+
+        // 合計日数の表示テキストを作成
         const sumPrefix = totalDaysSum >= 0 ? '+' : '-';
         const absSumDays = Math.abs(totalDaysSum);
-        totalDaysSummarySpan.textContent = `：${sumPrefix}${absSumDays}日`;
+
+        if (totalDaysSummarySpan) {
+            // 例: 「：+XX日」のように表示する場合
+            totalDaysSummarySpan.textContent = `：${sumPrefix}${absSumDays}日`;
+        }
     }
 
     // 履歴表示の更新
@@ -661,6 +668,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
+    function loadRouletteSpinCounts() {
+        try {
+            const data = localStorage.getItem('rouletteSpinCounts');
+            return data ? JSON.parse(data) : {};
+        } catch (error) {
+            console.error('ルーレット回転数の読み込みに失敗しました:', error);
+            return {};
+        }
+    }
+    
     // ローカルストレージへの保存
     function saveRoulettes() {
         try {
@@ -688,9 +705,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function saveRouletteSpinCounts() {
+        try {
+            localStorage.setItem('rouletteSpinCounts', JSON.stringify(rouletteSpinCounts));
+        } catch (error) {
+            alert('ルーレット回転数の保存に失敗しました: ' + error.message);
+        }
+    }
+
     // 合計リセット処理
     function handleResetTotals() {
-        if (!confirm('本当に合計をリセットしますか？この操作は元に戻せません。')) {
+        if (!confirm('本当に合計日数と全ルーレットの回転数をリセットしますか？\nこの操作は元に戻せません。')) {
             return; // キャンセルされたら何もしない
         }
 
@@ -711,9 +736,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 合計をリセット
         totals = {}; // 空のオブジェクトにする
         saveTotals(); // 空の合計データを保存
-        updateTotalsDisplay(); // 合計表示を更新 (空になる)
 
-        alert('合計をリセットしました。');
+        // ★ 全ルーレットの回転数をリセット
+        rouletteSpinCounts = {};
+        saveRouletteSpinCounts();
+
+        updateTotalsDisplay(); // 合計表示（日数のみ）を更新
+        updateCurrentRouletteSpinCountDisplay(); // 現在のルーレットの回転数表示を更新
+
+        alert('合計日数と全ルーレットの回転数をリセットしました。');
     }
 
     // 角度が範囲内にあるかをチェックする関数（360度をまたぐ場合も対応）
@@ -864,6 +895,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (history.length > 100) history.pop();
             saveHistory();
             updateHistoryDisplay();
+
+            // ★ 現在のルーレットの回転数をカウントアップ
+            if (!rouletteSpinCounts[currentRoulette]) {
+                rouletteSpinCounts[currentRoulette] = 0;
+            }
+            rouletteSpinCounts[currentRoulette]++;
+            saveRouletteSpinCounts();
+            updateCurrentRouletteSpinCountDisplay(); // ★ 表示も更新
+
             const compensatingRotation = -actualRotation;
             document.querySelectorAll('.section-label').forEach(label => {
                 label.style.transform = `translate(-50%, -50%) rotate(${compensatingRotation}deg)`;
@@ -910,6 +950,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (history.length > 100) history.pop();
                 saveHistory();
                 updateHistoryDisplay();
+
+                // ★ 現在のルーレットの回転数をカウントアップ
+                if (!rouletteSpinCounts[currentRoulette]) {
+                    rouletteSpinCounts[currentRoulette] = 0;
+                }
+                rouletteSpinCounts[currentRoulette]++;
+                saveRouletteSpinCounts();
+                updateCurrentRouletteSpinCountDisplay(); // ★ 表示も更新
+
                 const compensatingRotation = -actualRotation;
                 document.querySelectorAll('.section-label').forEach(label => {
                     label.style.transform = `translate(-50%, -50%) rotate(${compensatingRotation}deg)`;
@@ -993,10 +1042,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 3. ローカルストレージに保存
         saveRoulettes();
 
-        // 4. デフォルトルーレットに切り替え
+        // 4. rouletteSpinCounts からも削除
+        delete rouletteSpinCounts[currentRoulette];
+        saveRouletteSpinCounts();
+
+        // 5. デフォルトルーレットに切り替え
         currentRoulette = 'default';
 
-        // 5. UIを更新してデフォルト状態を表示
+        // 6. UIを更新してデフォルト状態を表示
         //    - 他のボタンから active クラスを削除 (念のため)
         document.querySelectorAll('.roulette-button').forEach(btn => {
             btn.classList.remove('active');
@@ -1011,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         createRouletteDisplay();
         //    - 削除ボタンを非表示に
         toggleDeleteButtonVisibility();
+        updateCurrentRouletteSpinCountDisplay(); // ★ 回転数表示も更新
 
         alert(`ルーレット「${buttonToRemove ? buttonToRemove.textContent : ''}」を削除しました。`);
     }
@@ -1023,8 +1077,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             localStorage.clear(); // 全てのlocalStorageデータを削除
+            // ★ クリア後、変数を初期状態に戻す (任意だがリロードしない場合に有効)
+            roulettes = {};
+            currentRoulette = 'default';
+            totals = {};
+            history = [];
+            rouletteSpinCounts = {};
+            // 再初期化処理を呼び出すか、リロードする
             alert('ローカルストレージをクリアしました。ページをリロードします。');
-            location.reload(); // ページをリロードして初期化処理を再実行させる
+            location.reload();
         } catch (error) {
             console.error('完全リセット処理中にエラーが発生しました:', error);
             alert('完全リセットに失敗しました。\n' + error);
@@ -1106,7 +1167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         var date = endDate.getDate();
 
         // ツイート内容の作成：内訳と合計、禁酒終了日を含める
-        var tweetMsg = "禁酒結果\n" + breakdown + "\n合計: " + totalText + "\n○○さんは、今日から" + month + "月" + date + "日まで禁酒します！";
+        var tweetMsg = "禁酒結果\n" + breakdown + "\n合計: " + totalText + "\n○○さんは、今日から" + month + "月" + date + "日まで禁酒します！がんばってね！！";
         var twitterUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
         window.open(twitterUrl, "_blank");
     }
@@ -1141,20 +1202,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // 新規追加: 回数を管理する変数と関数
-    let spinCount = 1;
-    const spinCountDisplay = document.getElementById('spin-count-display');
-    function updateSpinButtonText() {
-        spinCountDisplay.textContent = spinCount;
-    }
-    updateSpinButtonText();
-
-    spinCountDisplay.addEventListener('click', () => {
-        const input = prompt("何回回しますか？", spinCount);
-        const newCount = parseInt(input, 10);
-        if (!isNaN(newCount) && newCount > 0) {
-            spinCount = newCount;
-            updateSpinButtonText();
+    // ★ 新しい関数: 現在のルーレットの回転数を表示更新
+    function updateCurrentRouletteSpinCountDisplay() {
+        const countElement = document.getElementById('current-roulette-spin-count');
+        if (countElement) {
+            const count = rouletteSpinCounts[currentRoulette] || 0;
+            countElement.textContent = ` (${count} 回)`;
         }
-    });
+    }
 }); 
